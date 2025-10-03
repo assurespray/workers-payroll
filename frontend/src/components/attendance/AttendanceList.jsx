@@ -23,41 +23,61 @@ import { format } from 'date-fns';
 import { SHIFT_COLORS } from '../../utils/constants';
 
 const AttendanceList = () => {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [attendance, setAttendance] = useState([]);
   const [error, setError] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    const end = new Date();
-    const start = new Date();
-    start.setDate(start.getDate() - 7);
-    
-    const startDateStr = format(start, 'yyyy-MM-dd');
-    const endDateStr = format(end, 'yyyy-MM-dd');
-    
-    setStartDate(startDateStr);
-    setEndDate(endDateStr);
-    
-    fetchAttendance(startDateStr, endDateStr);
+    // Initialize dates safely
+    try {
+      const end = new Date();
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      
+      const startDateStr = format(start, 'yyyy-MM-dd');
+      const endDateStr = format(end, 'yyyy-MM-dd');
+      
+      setStartDate(startDateStr);
+      setEndDate(endDateStr);
+      
+      // Auto-fetch on mount
+      fetchAttendance(startDateStr, endDateStr);
+    } catch (err) {
+      console.error('Date initialization error:', err);
+      setError('Failed to initialize date range');
+    }
   }, []);
 
   const fetchAttendance = async (start, end) => {
     try {
       setLoading(true);
       setError('');
+      
+      console.log('📥 Fetching attendance:', { start, end });
+      
       const response = await attendanceService.getAll({
         startDate: start,
         endDate: end,
         limit: 500,
       });
       
-      // Ensure data is always an array
-      setAttendance(response?.data || []);
+      console.log('📨 Response:', response);
+      
+      // Safely handle response
+      if (response && response.data) {
+        const records = Array.isArray(response.data) ? response.data : [];
+        setAttendance(records);
+        console.log(`✅ Loaded ${records.length} attendance records`);
+      } else {
+        setAttendance([]);
+        console.log('ℹ️ No data in response');
+      }
     } catch (err) {
-      setError(err || 'Failed to load attendance');
-      setAttendance([]); // Set to empty array on error
+      console.error('❌ Fetch error:', err);
+      setError(err?.message || err || 'Failed to load attendance records');
+      setAttendance([]); // Always set to empty array on error
     } finally {
       setLoading(false);
     }
@@ -72,37 +92,40 @@ const AttendanceList = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this attendance record?')) {
-      try {
-        await attendanceService.delete(id);
-        setAttendance(attendance.filter(record => record._id !== id));
-      } catch (err) {
-        setError(err || 'Failed to delete attendance');
-      }
+    if (!window.confirm('Are you sure you want to delete this attendance record?')) {
+      return;
+    }
+
+    try {
+      await attendanceService.delete(id);
+      
+      // Remove from local state
+      setAttendance(prev => prev.filter(record => record._id !== id));
+      
+      console.log('✅ Attendance deleted');
+    } catch (err) {
+      console.error('❌ Delete error:', err);
+      setError(err?.message || err || 'Failed to delete attendance');
     }
   };
 
   const getShiftColor = (shiftType) => {
-    return SHIFT_COLORS[shiftType] || '#757575';
+    if (!shiftType) return '#757575';
+    return SHIFT_COLORS[shiftType.toLowerCase()] || '#757575';
   };
 
   const getShiftLabel = (shiftType) => {
+    if (!shiftType) return 'N/A';
+    
     const labels = {
       half: 'HALF DAY',
       full: 'FULL DAY',
       onehalf: 'ONE & HALF',
       double: 'DOUBLE'
     };
-    return labels[shiftType] || shiftType?.toUpperCase();
+    
+    return labels[shiftType.toLowerCase()] || shiftType.toUpperCase();
   };
-
-  if (loading && attendance.length === 0) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <Box>
@@ -126,6 +149,7 @@ const AttendanceList = () => {
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              disabled={loading}
             />
           </Grid>
           <Grid item xs={12} sm={4}>
@@ -136,6 +160,7 @@ const AttendanceList = () => {
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
+              disabled={loading}
             />
           </Grid>
           <Grid item xs={12} sm={4}>
@@ -165,54 +190,72 @@ const AttendanceList = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {!attendance || attendance.length === 0 ? (
+            {loading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
-                  {loading ? (
-                    <CircularProgress size={24} />
-                  ) : (
-                    'No attendance records found for the selected date range.'
-                  )}
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <CircularProgress size={40} />
+                  <Typography variant="body2" sx={{ mt: 2 }}>
+                    Loading attendance records...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : !Array.isArray(attendance) || attendance.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <Typography variant="body1" color="textSecondary">
+                    No attendance records found for the selected date range
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                    Try selecting a different date range or add attendance records first
+                  </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              attendance.map((record) => (
-                <TableRow key={record._id} hover>
-                  <TableCell>
-                    {record.date ? format(new Date(record.date), 'MMM dd, yyyy') : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {record.employeeId?.name || '-'}
-                    <br />
-                    <Typography variant="caption" color="textSecondary">
-                      {record.employeeId?.employeeId || '-'}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {record.contractorId?.name || '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getShiftLabel(record.shiftType)}
-                      size="small"
-                      sx={{
-                        bgcolor: getShiftColor(record.shiftType),
-                        color: 'white',
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell>{record.remarks || '-'}</TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      color="error"
-                      size="small"
-                      onClick={() => handleDelete(record._id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))
+              attendance.map((record) => {
+                // Safe data access with fallbacks
+                const employeeName = record?.employeeId?.name || 'Unknown';
+                const employeeCode = record?.employeeId?.employeeId || 'N/A';
+                const contractorName = record?.contractorId?.name || 'Unknown';
+                const recordDate = record?.date ? format(new Date(record.date), 'MMM dd, yyyy') : 'N/A';
+                const shiftType = record?.shiftType || 'N/A';
+                const remarks = record?.remarks || '-';
+                
+                return (
+                  <TableRow key={record._id} hover>
+                    <TableCell>{recordDate}</TableCell>
+                    <TableCell>
+                      {employeeName}
+                      <br />
+                      <Typography variant="caption" color="textSecondary">
+                        {employeeCode}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{contractorName}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={getShiftLabel(shiftType)}
+                        size="small"
+                        sx={{
+                          bgcolor: getShiftColor(shiftType),
+                          color: 'white',
+                          fontWeight: 'bold',
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>{remarks}</TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        color="error"
+                        size="small"
+                        onClick={() => handleDelete(record._id)}
+                        disabled={loading}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -220,7 +263,7 @@ const AttendanceList = () => {
 
       <Box sx={{ mt: 2 }}>
         <Typography variant="body2" color="textSecondary">
-          Total Records: {attendance?.length || 0}
+          Total Records: {Array.isArray(attendance) ? attendance.length : 0}
         </Typography>
       </Box>
     </Box>
@@ -228,4 +271,4 @@ const AttendanceList = () => {
 };
 
 export default AttendanceList;
-            
+        
