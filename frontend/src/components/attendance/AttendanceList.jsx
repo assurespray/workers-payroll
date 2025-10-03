@@ -17,7 +17,7 @@ import {
   Chip,
   IconButton,
 } from '@mui/material';
-import { Search as SearchIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Search as SearchIcon, Delete as DeleteIcon, Refresh as RefreshIcon } from '@mui/icons-material';
 import attendanceService from '../../services/attendanceService';
 import { format } from 'date-fns';
 import { SHIFT_COLORS } from '../../utils/constants';
@@ -30,111 +30,127 @@ const AttendanceList = () => {
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    // Initialize dates safely
+    initializeDates();
+  }, []);
+
+  const initializeDates = () => {
     try {
       const end = new Date();
       const start = new Date();
       start.setDate(start.getDate() - 7);
       
-      const startDateStr = format(start, 'yyyy-MM-dd');
-      const endDateStr = format(end, 'yyyy-MM-dd');
+      const startStr = format(start, 'yyyy-MM-dd');
+      const endStr = format(end, 'yyyy-MM-dd');
       
-      setStartDate(startDateStr);
-      setEndDate(endDateStr);
+      setStartDate(startStr);
+      setEndDate(endStr);
       
-      // Auto-fetch on mount
-      fetchAttendance(startDateStr, endDateStr);
+      // Auto-fetch
+      fetchAttendance(startStr, endStr);
     } catch (err) {
-      console.error('Date initialization error:', err);
-      setError('Failed to initialize date range');
+      console.error('Date init error:', err);
+      setError('Failed to initialize dates');
     }
-  }, []);
+  };
 
   const fetchAttendance = async (start, end) => {
+    setLoading(true);
+    setError('');
+    
     try {
-      setLoading(true);
-      setError('');
+      console.log('Fetching attendance:', { start, end });
       
-      console.log('📥 Fetching attendance:', { start, end });
-      
-      const response = await attendanceService.getAll({
+      const result = await attendanceService.getAll({
         startDate: start,
         endDate: end,
         limit: 500,
       });
       
-      console.log('📨 Response:', response);
+      console.log('Fetch result:', result);
       
-      // Safely handle response
-      if (response && response.data) {
-        const records = Array.isArray(response.data) ? response.data : [];
+      // Handle different response formats
+      if (result && result.data) {
+        const records = Array.isArray(result.data) ? result.data : [];
         setAttendance(records);
-        console.log(`✅ Loaded ${records.length} attendance records`);
+        console.log(`Loaded ${records.length} records`);
       } else {
         setAttendance([]);
-        console.log('ℹ️ No data in response');
+      }
+      
+      if (result.error) {
+        setError(result.error);
       }
     } catch (err) {
-      console.error('❌ Fetch error:', err);
-      setError(err?.message || err || 'Failed to load attendance records');
-      setAttendance([]); // Always set to empty array on error
+      console.error('Fetch error:', err);
+      setError(typeof err === 'string' ? err : 'Failed to load attendance records');
+      setAttendance([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSearch = () => {
+    if (!startDate || !endDate) {
+      setError('Please select both start and end dates');
+      return;
+    }
+    fetchAttendance(startDate, endDate);
+  };
+
+  const handleRefresh = () => {
     if (startDate && endDate) {
       fetchAttendance(startDate, endDate);
-    } else {
-      setError('Please select both start and end dates');
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this attendance record?')) {
-      return;
-    }
+    if (!window.confirm('Delete this attendance record?')) return;
 
     try {
       await attendanceService.delete(id);
-      
-      // Remove from local state
-      setAttendance(prev => prev.filter(record => record._id !== id));
-      
-      console.log('✅ Attendance deleted');
+      setAttendance(prev => prev.filter(r => r._id !== id));
     } catch (err) {
-      console.error('❌ Delete error:', err);
-      setError(err?.message || err || 'Failed to delete attendance');
+      setError(typeof err === 'string' ? err : 'Failed to delete');
     }
   };
 
-  const getShiftColor = (shiftType) => {
-    if (!shiftType) return '#757575';
-    return SHIFT_COLORS[shiftType.toLowerCase()] || '#757575';
+  const getShiftColor = (type) => {
+    if (!type) return '#757575';
+    return SHIFT_COLORS[type.toLowerCase()] || '#757575';
   };
 
-  const getShiftLabel = (shiftType) => {
-    if (!shiftType) return 'N/A';
-    
+  const getShiftLabel = (type) => {
+    if (!type) return 'N/A';
     const labels = {
       half: 'HALF DAY',
       full: 'FULL DAY',
       onehalf: 'ONE & HALF',
       double: 'DOUBLE'
     };
-    
-    return labels[shiftType.toLowerCase()] || shiftType.toUpperCase();
+    return labels[type.toLowerCase()] || type.toUpperCase();
+  };
+
+  const safeDate = (dateValue) => {
+    try {
+      return dateValue ? format(new Date(dateValue), 'MMM dd, yyyy') : 'N/A';
+    } catch {
+      return 'Invalid Date';
+    }
   };
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Attendance Records
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h4">
+          Attendance Records
+        </Typography>
+        <IconButton onClick={handleRefresh} disabled={loading} color="primary">
+          <RefreshIcon />
+        </IconButton>
+      </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
           {error}
         </Alert>
       )}
@@ -193,10 +209,8 @@ const AttendanceList = () => {
             {loading ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                  <CircularProgress size={40} />
-                  <Typography variant="body2" sx={{ mt: 2 }}>
-                    Loading attendance records...
-                  </Typography>
+                  <CircularProgress />
+                  <Typography sx={{ mt: 2 }}>Loading...</Typography>
                 </TableCell>
               </TableRow>
             ) : !Array.isArray(attendance) || attendance.length === 0 ? (
@@ -211,51 +225,37 @@ const AttendanceList = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              attendance.map((record) => {
-                // Safe data access with fallbacks
-                const employeeName = record?.employeeId?.name || 'Unknown';
-                const employeeCode = record?.employeeId?.employeeId || 'N/A';
-                const contractorName = record?.contractorId?.name || 'Unknown';
-                const recordDate = record?.date ? format(new Date(record.date), 'MMM dd, yyyy') : 'N/A';
-                const shiftType = record?.shiftType || 'N/A';
-                const remarks = record?.remarks || '-';
-                
-                return (
-                  <TableRow key={record._id} hover>
-                    <TableCell>{recordDate}</TableCell>
-                    <TableCell>
-                      {employeeName}
-                      <br />
-                      <Typography variant="caption" color="textSecondary">
-                        {employeeCode}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{contractorName}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getShiftLabel(shiftType)}
-                        size="small"
-                        sx={{
-                          bgcolor: getShiftColor(shiftType),
-                          color: 'white',
-                          fontWeight: 'bold',
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>{remarks}</TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        color="error"
-                        size="small"
-                        onClick={() => handleDelete(record._id)}
-                        disabled={loading}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+              attendance.map((record) => (
+                <TableRow key={record._id} hover>
+                  <TableCell>{safeDate(record.date)}</TableCell>
+                  <TableCell>
+                    {record.employeeId?.name || 'Unknown'}
+                    <br />
+                    <Typography variant="caption" color="textSecondary">
+                      {record.employeeId?.employeeId || 'N/A'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{record.contractorId?.name || 'Unknown'}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getShiftLabel(record.shiftType)}
+                      size="small"
+                      sx={{ bgcolor: getShiftColor(record.shiftType), color: 'white' }}
+                    />
+                  </TableCell>
+                  <TableCell>{record.remarks || '-'}</TableCell>
+                  <TableCell align="center">
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDelete(record._id)}
+                      disabled={loading}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -271,4 +271,4 @@ const AttendanceList = () => {
 };
 
 export default AttendanceList;
-        
+    
