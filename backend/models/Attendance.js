@@ -39,6 +39,7 @@ attendanceSchema.virtual('shiftValue').get(function() {
   const shiftValues = {
     half: 0.5,
     full: 1.0,
+    onehalf: 1.5,  // ← Added
     double: 2.0
   };
   return shiftValues[this.shiftType] || 0;
