@@ -16,9 +16,10 @@ const employeeSchema = new mongoose.Schema({
   },
   phoneNumber: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false,  // ← CHANGED: Now optional
     validate: {
       validator: function(v) {
+        if (!v) return true; // Allow empty
         return /^[0-9]{10}$/.test(v);
       },
       message: 'Phone number must be exactly 10 digits'
@@ -26,9 +27,11 @@ const employeeSchema = new mongoose.Schema({
   },
   aadharNumber: {
     type: String,
-    required: [true, 'Aadhar number is required'],
+    required: false,  // ← CHANGED: Now optional
     validate: {
       validator: function(v) {
+        if (!v) return true; // Allow empty
+        // Accept both plain and encrypted formats
         if (v.length > 20) return true; // Already encrypted
         return /^[0-9]{12}$/.test(v); // Plain 12 digits
       },
@@ -64,11 +67,11 @@ const employeeSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Encrypt Aadhar before saving
+// Encrypt Aadhar before saving (only if provided)
 employeeSchema.pre('save', function(next) {
   if (this.isModified('aadharNumber') && this.aadharNumber) {
     try {
-      // Only encrypt if not already encrypted
+      // Only encrypt if not already encrypted (plain 12 digits)
       if (/^[0-9]{12}$/.test(this.aadharNumber)) {
         const encrypted = CryptoJS.AES.encrypt(
           this.aadharNumber,
@@ -83,8 +86,8 @@ employeeSchema.pre('save', function(next) {
   next();
 });
 
-// Generate employee ID automatically
-employeeSchema.pre('save', async function(next) {
+// Generate employee ID automatically BEFORE validation
+employeeSchema.pre('validate', async function(next) {
   if (!this.employeeId) {
     try {
       const count = await this.constructor.countDocuments();
@@ -100,6 +103,7 @@ employeeSchema.pre('save', async function(next) {
 // Method to decrypt Aadhar
 employeeSchema.methods.decryptAadhar = function(encrypted) {
   try {
+    if (!encrypted && !this.aadharNumber) return null;
     const decrypted = CryptoJS.AES.decrypt(
       encrypted || this.aadharNumber,
       process.env.AADHAR_ENCRYPTION_KEY
@@ -110,23 +114,19 @@ employeeSchema.methods.decryptAadhar = function(encrypted) {
   }
 };
 
-// Method to get masked Aadhar (XXXX-XXXX-1234)
+// Method to get masked Aadhar
 employeeSchema.methods.getMaskedAadhar = function() {
   try {
+    if (!this.aadharNumber) return 'Not Provided';
     const decrypted = this.decryptAadhar();
     if (decrypted && decrypted.length === 12) {
       return `XXXX-XXXX-${decrypted.slice(-4)}`;
     }
     return 'XXXX-XXXX-XXXX';
   } catch {
-    return 'XXXX-XXXX-XXXX';
+    return 'Not Provided';
   }
 };
-
-// Virtual to get full Aadhar (for authorized access)
-employeeSchema.virtual('aadharDecrypted').get(function() {
-  return this.decryptAadhar();
-});
 
 // Indexes
 employeeSchema.index({ employeeId: 1 });
