@@ -29,13 +29,8 @@ const employeeSchema = new mongoose.Schema({
     required: [true, 'Aadhar number is required'],
     validate: {
       validator: function(v) {
-        // Validate decrypted value
-        try {
-          const decrypted = this.decryptAadhar(v);
-          return /^[0-9]{12}$/.test(decrypted);
-        } catch {
-          return /^[0-9]{12}$/.test(v);
-        }
+        if (v.length > 20) return true; // Already encrypted
+        return /^[0-9]{12}$/.test(v); // Plain 12 digits
       },
       message: 'Aadhar number must be exactly 12 digits'
     }
