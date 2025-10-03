@@ -29,7 +29,7 @@ const siteSchema = new mongoose.Schema({
 const contractorSchema = new mongoose.Schema({
   contractorId: {
     type: String,
-    required: [true, 'Contractor ID is required'],
+    required: false,  // ← CHANGED: Backend generates automatically
     unique: true,
     uppercase: true,
     trim: true
@@ -59,8 +59,8 @@ const contractorSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Generate contractor ID automatically
-contractorSchema.pre('save', async function(next) {
+// Generate contractor ID automatically BEFORE validation
+contractorSchema.pre('validate', async function(next) {
   if (!this.contractorId) {
     try {
       const count = await this.constructor.countDocuments();
@@ -84,6 +84,38 @@ contractorSchema.methods.addSite = function(siteData) {
   return this.save();
 };
 
+// Method to update site
+contractorSchema.methods.updateSite = function(siteId, siteData) {
+  const site = this.sites.id(siteId);
+  if (site) {
+    Object.assign(site, siteData);
+    return this.save();
+  }
+  throw new Error('Site not found');
+};
+
+// Method to delete site (soft delete)
+contractorSchema.methods.deleteSite = function(siteId) {
+  const site = this.sites.id(siteId);
+  if (site) {
+    site.isActive = false;
+    return this.save();
+  }
+  throw new Error('Site not found');
+};
+
+// Method to get active sites
+contractorSchema.methods.getActiveSites = function() {
+  return this.sites.filter(site => site.isActive);
+};
+
+// Indexes
+contractorSchema.index({ contractorId: 1 });
+contractorSchema.index({ name: 1 });
+contractorSchema.index({ isActive: 1 });
+contractorSchema.index({ 'sites._id': 1 });
+
+module.exports = mongoose.model('Contractor', contractorSchema);
 // Method to update site
 contractorSchema.methods.updateSite = function(siteId, siteData) {
   const site = this.sites.id(siteId);
