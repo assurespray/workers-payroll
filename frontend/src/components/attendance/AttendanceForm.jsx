@@ -125,12 +125,17 @@ const AttendanceForm = () => {
 
       await attendanceService.create(attendanceData);
       
-      setSuccess('Attendance marked successfully!');
+      setSuccess(`Attendance marked successfully for ${attendanceData.attendanceRecords.length} workers!`);
       setTimeout(() => {
         resetForm();
       }, 2000);
     } catch (err) {
-      setError(err || 'Failed to mark attendance');
+      // Improved error message
+      if (err && err.includes('already exists')) {
+        setError('⚠️ Attendance already marked for one or more workers on this date at this site. Please check the Attendance List or select a different date.');
+      } else {
+        setError(err || 'Failed to mark attendance');
+      }
     } finally {
       setLoading(false);
     }
