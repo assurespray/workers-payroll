@@ -159,8 +159,8 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Phone Number"
-                required
+                label="Phone Number (Optional)"
+                required={false}
                 value={formData.phoneNumber}
                 onChange={(e) => handleChange('phoneNumber', e.target.value)}
                 error={!!errors.phoneNumber}
@@ -173,8 +173,8 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Aadhar Number"
-                  required
+                  label="Aadhar Number (Optional)"
+                  required={false}
                   value={formData.aadharNumber}
                   onChange={(e) => handleChange('aadharNumber', e.target.value)}
                   error={!!errors.aadharNumber}
