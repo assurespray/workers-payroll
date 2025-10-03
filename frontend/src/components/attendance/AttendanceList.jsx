@@ -34,10 +34,13 @@ const AttendanceList = () => {
     const start = new Date();
     start.setDate(start.getDate() - 7);
     
-    setStartDate(format(start, 'yyyy-MM-dd'));
-    setEndDate(format(end, 'yyyy-MM-dd'));
+    const startDateStr = format(start, 'yyyy-MM-dd');
+    const endDateStr = format(end, 'yyyy-MM-dd');
     
-    fetchAttendance(format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
+    setStartDate(startDateStr);
+    setEndDate(endDateStr);
+    
+    fetchAttendance(startDateStr, endDateStr);
   }, []);
 
   const fetchAttendance = async (start, end) => {
@@ -49,9 +52,12 @@ const AttendanceList = () => {
         endDate: end,
         limit: 500,
       });
-      setAttendance(response.data || []);
+      
+      // Ensure data is always an array
+      setAttendance(response?.data || []);
     } catch (err) {
       setError(err || 'Failed to load attendance');
+      setAttendance([]); // Set to empty array on error
     } finally {
       setLoading(false);
     }
@@ -60,6 +66,8 @@ const AttendanceList = () => {
   const handleSearch = () => {
     if (startDate && endDate) {
       fetchAttendance(startDate, endDate);
+    } else {
+      setError('Please select both start and end dates');
     }
   };
 
@@ -67,7 +75,7 @@ const AttendanceList = () => {
     if (window.confirm('Are you sure you want to delete this attendance record?')) {
       try {
         await attendanceService.delete(id);
-        fetchAttendance(startDate, endDate);
+        setAttendance(attendance.filter(record => record._id !== id));
       } catch (err) {
         setError(err || 'Failed to delete attendance');
       }
@@ -76,6 +84,16 @@ const AttendanceList = () => {
 
   const getShiftColor = (shiftType) => {
     return SHIFT_COLORS[shiftType] || '#757575';
+  };
+
+  const getShiftLabel = (shiftType) => {
+    const labels = {
+      half: 'HALF DAY',
+      full: 'FULL DAY',
+      onehalf: 'ONE & HALF',
+      double: 'DOUBLE'
+    };
+    return labels[shiftType] || shiftType?.toUpperCase();
   };
 
   if (loading && attendance.length === 0) {
@@ -93,7 +111,7 @@ const AttendanceList = () => {
       </Typography>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}
         </Alert>
       )}
@@ -128,7 +146,7 @@ const AttendanceList = () => {
               fullWidth
               disabled={loading}
             >
-              Search
+              {loading ? 'Searching...' : 'Search'}
             </Button>
           </Grid>
         </Grid>
@@ -147,23 +165,27 @@ const AttendanceList = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {attendance.length === 0 ? (
+            {!attendance || attendance.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center">
-                  No attendance records found for the selected date range.
+                  {loading ? (
+                    <CircularProgress size={24} />
+                  ) : (
+                    'No attendance records found for the selected date range.'
+                  )}
                 </TableCell>
               </TableRow>
             ) : (
               attendance.map((record) => (
                 <TableRow key={record._id} hover>
                   <TableCell>
-                    {format(new Date(record.date), 'MMM dd, yyyy')}
+                    {record.date ? format(new Date(record.date), 'MMM dd, yyyy') : '-'}
                   </TableCell>
                   <TableCell>
                     {record.employeeId?.name || '-'}
                     <br />
                     <Typography variant="caption" color="textSecondary">
-                      {record.employeeId?.employeeId}
+                      {record.employeeId?.employeeId || '-'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -171,7 +193,7 @@ const AttendanceList = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={record.shiftType?.toUpperCase()}
+                      label={getShiftLabel(record.shiftType)}
                       size="small"
                       sx={{
                         bgcolor: getShiftColor(record.shiftType),
@@ -198,7 +220,7 @@ const AttendanceList = () => {
 
       <Box sx={{ mt: 2 }}>
         <Typography variant="body2" color="textSecondary">
-          Total Records: {attendance.length}
+          Total Records: {attendance?.length || 0}
         </Typography>
       </Box>
     </Box>
@@ -206,4 +228,4 @@ const AttendanceList = () => {
 };
 
 export default AttendanceList;
-        
+            
