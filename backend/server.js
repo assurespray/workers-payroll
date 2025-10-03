@@ -1,95 +1,128 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
-const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
-const connectDB = require('./config/database');
 
 // Load environment variables
 dotenv.config();
 
-// Connect to database
-connectDB();
-
+// Create Express app
 const app = express();
 
-// ⭐ CRITICAL: Trust proxy for Render.com deployment
+// Trust proxy (CRITICAL for Render.com)
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log('✅ MongoDB Connected'))
+  .catch((err) => {
+    console.error('❌ MongoDB Connection Error:', err.message);
+    process.exit(1);
+  });
 
-// CORS configuration
+// Rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Middleware
+app.use(helmet());
 app.use(cors({
   origin: process.env.CLIENT_URL || '*',
   credentials: true
 }));
-
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
-}
-
-// Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Rate limiting middleware
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Too many requests from this IP, please try again later.'
-  }
-});
-
-// Apply rate limiting to all API routes
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/', limiter);
 
-// API Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/employees', require('./routes/employees'));
-app.use('/api/contractors', require('./routes/contractors'));
-app.use('/api/attendance', require('./routes/attendance'));
-app.use('/api/reports', require('./routes/reports'));
-app.use('/api/payroll', require('./routes/payroll'));
-
-// Health check endpoint
+// Health check (before routes)
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    success: true,
+    status: 'OK',
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
-    database: 'Connected',
+    database: mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected',
     environment: process.env.NODE_ENV || 'production'
   });
 });
 
-// Root route
+// Root endpoint
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Construction Workers & Payroll Management API',
     version: '1.0.0',
-    status: 'Running'
+    status: 'Running',
+    endpoints: {
+      health: '/api/health',
+      auth: '/api/auth',
+      employees: '/api/employees',
+      contractors: '/api/contractors',
+      attendance: '/api/attendance',
+      reports: '/api/reports'
+    }
   });
 });
+
+// API Routes (with error handling for missing files)
+try {
+  app.use('/api/auth', require('./routes/auth'));
+  console.log('✅ Auth routes loaded');
+} catch (err) {
+  console.error('❌ Error loading auth routes:', err.message);
+}
+
+try {
+  app.use('/api/employees', require('./routes/employees'));
+  console.log('✅ Employee routes loaded');
+} catch (err) {
+  console.error('❌ Error loading employee routes:', err.message);
+}
+
+try {
+  app.use('/api/contractors', require('./routes/contractors'));
+  console.log('✅ Contractor routes loaded');
+} catch (err) {
+  console.error('❌ Error loading contractor routes:', err.message);
+}
+
+try {
+  app.use('/api/attendance', require('./routes/attendance'));
+  console.log('✅ Attendance routes loaded');
+} catch (err) {
+  console.error('❌ Error loading attendance routes:', err.message);
+}
+
+try {
+  app.use('/api/reports', require('./routes/reports'));
+  console.log('✅ Report routes loaded');
+} catch (err) {
+  console.error('❌ Error loading report routes:', err.message);
+}
+
+try {
+  app.use('/api/payroll', require('./routes/payroll'));
+  console.log('✅ Payroll routes loaded');
+} catch (err) {
+  console.error('❌ Error loading payroll routes:', err.message);
+}
 
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found'
+    message: `Route ${req.method} ${req.path} not found`
   });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  
+  console.error('❌ Server Error:', err);
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Internal server error',
@@ -97,27 +130,25 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Server configuration
+// Start server
 const PORT = process.env.PORT || 10000;
 const HOST = process.env.HOST || '0.0.0.0';
 
-// Start server
-const server = app.listen(PORT, HOST, () => {
-  console.log(`
-    ╔════════════════════════════════════════╗
-    ║  🏗️  Construction Workers & Payroll   ║
-    ║  Server: ${HOST}:${PORT}              ║
-    ║  Environment: ${process.env.NODE_ENV || 'production'}        ║
-    ║  Database: Connected ✅                ║
-    ╚════════════════════════════════════════╝
-  `);
+app.listen(PORT, HOST, () => {
+  console.log('═══════════════════════════════════════');
+  console.log('🏗️  Construction Workers & Payroll');
+  console.log('═══════════════════════════════════════');
+  console.log(`📡 Server: ${HOST}:${PORT}`);
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'production'}`);
+  console.log(`🗄️  Database: ${mongoose.connection.readyState === 1 ? 'Connected ✅' : 'Connecting...'}`);
+  console.log('═══════════════════════════════════════');
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
+  console.log('SIGTERM signal received: closing server');
+  mongoose.connection.close(() => {
+    console.log('MongoDB connection closed');
     process.exit(0);
   });
 });
