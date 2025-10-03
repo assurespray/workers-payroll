@@ -11,7 +11,6 @@ import {
   Alert,
 } from '@mui/material';
 import employeeService from '../../services/employeeService';
-import { validators } from '../../utils/validators';
 
 const EmployeeDialog = ({ open, onClose, employee }) => {
   const [loading, setLoading] = useState(false);
@@ -66,20 +65,30 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    const nameError = validators.required(formData.name, 'Name');
-    if (nameError) newErrors.name = nameError;
-
-    const phoneError = validators.phone(formData.phoneNumber);
-    if (phoneError) newErrors.phoneNumber = phoneError;
-
-    if (!employee) {
-      const aadharError = validators.aadhar(formData.aadharNumber);
-      if (aadharError) newErrors.aadharNumber = aadharError;
+    // Name is required
+    if (!formData.name || !formData.name.trim()) {
+      newErrors.name = 'Name is required';
     }
 
-    if (formData.bankDetails.ifscCode) {
-      const ifscError = validators.ifsc(formData.bankDetails.ifscCode);
-      if (ifscError) newErrors.ifscCode = ifscError;
+    // Phone is OPTIONAL - only validate if provided
+    if (formData.phoneNumber && formData.phoneNumber.trim()) {
+      if (!/^[0-9]{10}$/.test(formData.phoneNumber)) {
+        newErrors.phoneNumber = 'Phone number must be exactly 10 digits';
+      }
+    }
+
+    // Aadhar is OPTIONAL - only validate if provided
+    if (!employee && formData.aadharNumber && formData.aadharNumber.trim()) {
+      if (!/^[0-9]{12}$/.test(formData.aadharNumber)) {
+        newErrors.aadharNumber = 'Aadhar number must be exactly 12 digits';
+      }
+    }
+
+    // IFSC is optional - only validate if provided
+    if (formData.bankDetails.ifscCode && formData.bankDetails.ifscCode.trim()) {
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(formData.bankDetails.ifscCode)) {
+        newErrors.ifscCode = 'Invalid IFSC code format';
+      }
     }
 
     setErrors(newErrors);
@@ -97,10 +106,23 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
       setLoading(true);
       setError('');
 
+      // Clean up empty strings to null for optional fields
+      const cleanedData = {
+        ...formData,
+        phoneNumber: formData.phoneNumber.trim() || undefined,
+        aadharNumber: formData.aadharNumber.trim() || undefined,
+        bankDetails: {
+          accountNumber: formData.bankDetails.accountNumber.trim() || undefined,
+          ifscCode: formData.bankDetails.ifscCode.trim() || undefined,
+          bankName: formData.bankDetails.bankName.trim() || undefined,
+          branch: formData.bankDetails.branch.trim() || undefined,
+        }
+      };
+
       if (employee) {
-        await employeeService.update(employee._id, formData);
+        await employeeService.update(employee._id, cleanedData);
       } else {
-        await employeeService.create(formData);
+        await employeeService.create(cleanedData);
       }
 
       onClose(true);
@@ -125,6 +147,7 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
       setFormData(prev => ({ ...prev, [field]: value }));
     }
     
+    // Clear error when user types
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
     }
@@ -160,11 +183,10 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
               <TextField
                 fullWidth
                 label="Phone Number (Optional)"
-                required={false}
                 value={formData.phoneNumber}
                 onChange={(e) => handleChange('phoneNumber', e.target.value)}
                 error={!!errors.phoneNumber}
-                helperText={errors.phoneNumber}
+                helperText={errors.phoneNumber || '10 digits'}
                 disabled={loading}
                 inputProps={{ maxLength: 10 }}
               />
@@ -174,7 +196,6 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
                 <TextField
                   fullWidth
                   label="Aadhar Number (Optional)"
-                  required={false}
                   value={formData.aadharNumber}
                   onChange={(e) => handleChange('aadharNumber', e.target.value)}
                   error={!!errors.aadharNumber}
@@ -187,7 +208,7 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Bank Account Number"
+                label="Bank Account Number (Optional)"
                 value={formData.bankDetails.accountNumber}
                 onChange={(e) => handleChange('bankDetails.accountNumber', e.target.value)}
                 disabled={loading}
@@ -196,7 +217,7 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="IFSC Code"
+                label="IFSC Code (Optional)"
                 value={formData.bankDetails.ifscCode}
                 onChange={(e) => handleChange('bankDetails.ifscCode', e.target.value.toUpperCase())}
                 error={!!errors.ifscCode}
@@ -207,7 +228,7 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Bank Name"
+                label="Bank Name (Optional)"
                 value={formData.bankDetails.bankName}
                 onChange={(e) => handleChange('bankDetails.bankName', e.target.value)}
                 disabled={loading}
@@ -216,7 +237,7 @@ const EmployeeDialog = ({ open, onClose, employee }) => {
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Branch"
+                label="Branch (Optional)"
                 value={formData.bankDetails.branch}
                 onChange={(e) => handleChange('bankDetails.branch', e.target.value)}
                 disabled={loading}
