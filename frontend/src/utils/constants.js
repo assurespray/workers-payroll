@@ -7,17 +7,19 @@ export const DISPLAY_DATE_FORMAT = 'MMM dd, yyyy';
 export const TIME_FORMAT = 'HH:mm';
 export const DATETIME_FORMAT = 'yyyy-MM-dd HH:mm:ss';
 
-// Shift types
+// Shift types - UPDATED with "One and Half"
 export const SHIFT_TYPES = [
-  { value: 'half', label: 'Half Day', multiplier: 0.5 },
-  { value: 'full', label: 'Full Day', multiplier: 1.0 },
-  { value: 'double', label: 'Double Shift', multiplier: 2.0 },
+  { value: 'half', label: 'Half Day (0.5)', multiplier: 0.5 },
+  { value: 'full', label: 'Full Day (1.0)', multiplier: 1.0 },
+  { value: 'onehalf', label: 'One and Half (1.5)', multiplier: 1.5 },  // ← NEW
+  { value: 'double', label: 'Double Shift (2.0)', multiplier: 2.0 },
 ];
 
 // Shift colors
 export const SHIFT_COLORS = {
   half: '#ff9800',
   full: '#4caf50',
+  onehalf: '#9c27b0',   // Purple - NEW
   double: '#2196f3',
 };
 
