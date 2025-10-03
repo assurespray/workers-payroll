@@ -22,7 +22,7 @@ const attendanceSchema = new mongoose.Schema({
   },
   shiftType: {
     type: String,
-    enum: ['half', 'full', 'double'],
+    enum: ['half', 'full', 'onehalf', 'double'],
     required: [true, 'Shift type is required'],
     lowercase: true
   },
