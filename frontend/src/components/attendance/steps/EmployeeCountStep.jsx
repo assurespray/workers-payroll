@@ -2,19 +2,48 @@ import React from 'react';
 import { Box, Typography, TextField } from '@mui/material';
 
 const EmployeeCountStep = ({ count, onChange }) => {
+  const [inputValue, setInputValue] = React.useState(count.toString());
+
+  // Update local input when count prop changes
+  React.useEffect(() => {
+    setInputValue(count.toString());
+  }, [count]);
+
   const handleChange = (e) => {
     const value = e.target.value;
     
-    // Allow empty string for deletion
+    // Allow empty string temporarily (while user is deleting)
     if (value === '') {
-      onChange(1);
+      setInputValue('');
       return;
     }
     
-    // Parse and validate
+    // Only allow numbers
+    if (!/^\d+$/.test(value)) {
+      return;
+    }
+    
+    // Update local state immediately for responsive UI
+    setInputValue(value);
+    
+    // Parse and validate for parent component
     const num = parseInt(value);
     if (!isNaN(num) && num >= 1 && num <= 100) {
       onChange(num);
+    }
+  };
+
+  const handleBlur = () => {
+    // If empty or invalid on blur, reset to minimum value
+    if (inputValue === '' || parseInt(inputValue) < 1) {
+      setInputValue('1');
+      onChange(1);
+    } else {
+      const num = parseInt(inputValue);
+      if (num > 100) {
+        setInputValue('100');
+        onChange(100);
+      }
     }
   };
 
@@ -30,14 +59,15 @@ const EmployeeCountStep = ({ count, onChange }) => {
       <TextField
         fullWidth
         label="Number of Employees"
-        value={count}
+        value={inputValue}
         onChange={handleChange}
-        type="text"
+        onBlur={handleBlur}
         inputProps={{ 
           inputMode: 'numeric',
           pattern: '[0-9]*'
         }}
         helperText="Enter number between 1 and 100"
+        placeholder="Enter number"
       />
     </Box>
   );
