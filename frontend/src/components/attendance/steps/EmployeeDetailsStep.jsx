@@ -31,11 +31,6 @@ const EmployeeDetailsStep = ({ employees, attendanceRecords, onChange }) => {
     onChange(newRecords);
   };
 
-  const getEmployeeName = (employeeId) => {
-    const emp = employees.find(e => e._id === employeeId);
-    return emp ? `${emp.name} (${emp.employeeId})` : '';
-  };
-
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
