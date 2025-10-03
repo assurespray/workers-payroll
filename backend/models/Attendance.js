@@ -103,6 +103,10 @@ attendanceSchema.statics.getEmployeeSummary = async function(employeeId, startDa
         summary.fullDays++;
         summary.totalEquivalentDays += 1.0;
         break;
+      case 'onehalf':  // ← Added
+        summary.oneHalfDays++;
+        summary.totalEquivalentDays += 1.5;
+        break;
       case 'double':
         summary.doubleDays++;
         summary.totalEquivalentDays += 2.0;
@@ -133,6 +137,7 @@ attendanceSchema.statics.getContractorReport = async function(contractorId, site
         summary: {
           halfDays: 0,
           fullDays: 0,
+          oneHalfDays: 0,  // ← Added
           doubleDays: 0,
           totalEquivalentDays: 0
         }
@@ -150,6 +155,10 @@ attendanceSchema.statics.getContractorReport = async function(contractorId, site
       case 'full':
         employeeMap[empId].summary.fullDays++;
         employeeMap[empId].summary.totalEquivalentDays += 1.0;
+        break;
+      case 'onehalf':  // ← Added
+        employeeMap[empId].summary.oneHalfDays++;
+        employeeMap[empId].summary.totalEquivalentDays += 1.5;
         break;
       case 'double':
         employeeMap[empId].summary.doubleDays++;
