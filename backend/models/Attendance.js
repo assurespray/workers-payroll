@@ -88,6 +88,7 @@ attendanceSchema.statics.getEmployeeSummary = async function(employeeId, startDa
     totalRecords: records.length,
     halfDays: 0,
     fullDays: 0,
+    oneHalfDays: 0,  // ← Added
     doubleDays: 0,
     totalEquivalentDays: 0
   };
