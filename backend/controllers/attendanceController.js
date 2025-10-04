@@ -1,23 +1,32 @@
 const Attendance = require('../models/Attendance');
-const Employee = require('../models/Employee');
-const Contractor = require('../models/Contractor');
 
-// @desc    Create attendance
-// @route   POST /api/attendance
-// @access  Private
+// Create attendance (bulk)
 exports.createAttendance = async (req, res) => {
   try {
     const { attendanceRecords } = req.body;
     
+    console.log('📥 Create attendance request:', {
+      recordCount: attendanceRecords?.length || 0
+    });
+    
     if (!attendanceRecords || !Array.isArray(attendanceRecords)) {
       return res.status(400).json({
         success: false,
-        message: 'Attendance records array is required'
+        message: 'attendanceRecords must be an array'
       });
     }
     
-    // Create multiple attendance records
+    if (attendanceRecords.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one attendance record is required'
+      });
+    }
+    
+    // Insert all records
     const createdRecords = await Attendance.insertMany(attendanceRecords);
+    
+    console.log(`✅ Created ${createdRecords.length} attendance records`);
     
     res.status(201).json({
       success: true,
@@ -26,32 +35,32 @@ exports.createAttendance = async (req, res) => {
       data: createdRecords
     });
   } catch (error) {
+    console.error('❌ Create attendance error:', error);
+    
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: 'Attendance already exists for one or more employees on this date'
+        message: 'Duplicate attendance entry'
       });
     }
+    
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to create attendance'
     });
   }
 };
 
-// @desc    Get all attendance
-// @route   GET /api/attendance
-// @access  Private
-exports.getAttendance = async (req, res) => {
+// Get all attendance with filters
+exports.getAllAttendance = async (req, res) => {
   try {
-    const { contractorId, siteId, employeeId, startDate, endDate, limit = 100 } = req.query;
+    const { startDate, endDate, employeeId, contractorId, siteId, limit = 100 } = req.query;
+    
+    console.log('📥 Get attendance:', { startDate, endDate, limit });
     
     const query = {};
     
-    if (contractorId) query.contractorId = contractorId;
-    if (siteId) query.siteId = siteId;
-    if (employeeId) query.employeeId = employeeId;
-    
+    // Date range filter
     if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate),
@@ -59,11 +68,19 @@ exports.getAttendance = async (req, res) => {
       };
     }
     
+    // Other filters
+    if (employeeId) query.employeeId = employeeId;
+    if (contractorId) query.contractorId = contractorId;
+    if (siteId) query.siteId = siteId;
+    
+    // Execute query
     const attendance = await Attendance.find(query)
-      .populate('employeeId', 'employeeId name phoneNumber')
-      .populate('contractorId', 'contractorId name')
+      .populate('employeeId', 'name employeeId')
+      .populate('contractorId', 'name contractorId')
       .sort({ date: -1 })
       .limit(parseInt(limit));
+    
+    console.log(`✅ Found ${attendance.length} records`);
     
     res.json({
       success: true,
@@ -71,26 +88,27 @@ exports.getAttendance = async (req, res) => {
       data: attendance
     });
   } catch (error) {
+    console.error('❌ Get attendance error:', error);
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message || 'Failed to fetch attendance'
     });
   }
 };
 
-// @desc    Get single attendance
-// @route   GET /api/attendance/:id
-// @access  Private
-exports.getSingleAttendance = async (req, res) => {
+// Get attendance by ID
+exports.getAttendanceById = async (req, res) => {
   try {
-    const attendance = await Attendance.findById(req.params.id)
-      .populate('employeeId', 'employeeId name phoneNumber')
-      .populate('contractorId', 'contractorId name');
+    const { id } = req.params;
+    
+    const attendance = await Attendance.findById(id)
+      .populate('employeeId')
+      .populate('contractorId');
     
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance not found'
+        message: 'Attendance record not found'
       });
     }
     
@@ -99,6 +117,7 @@ exports.getSingleAttendance = async (req, res) => {
       data: attendance
     });
   } catch (error) {
+    console.error('❌ Get attendance by ID error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -106,23 +125,26 @@ exports.getSingleAttendance = async (req, res) => {
   }
 };
 
-// @desc    Update attendance
-// @route   PUT /api/attendance/:id
-// @access  Private
+// Update attendance
 exports.updateAttendance = async (req, res) => {
   try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
     const attendance = await Attendance.findByIdAndUpdate(
-      req.params.id,
-      req.body,
+      id,
+      updateData,
       { new: true, runValidators: true }
-    ).populate('employeeId contractorId');
+    );
     
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance not found'
+        message: 'Attendance record not found'
       });
     }
+    
+    console.log(`✅ Updated attendance: ${id}`);
     
     res.json({
       success: true,
@@ -130,6 +152,7 @@ exports.updateAttendance = async (req, res) => {
       data: attendance
     });
   } catch (error) {
+    console.error('❌ Update attendance error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -137,28 +160,64 @@ exports.updateAttendance = async (req, res) => {
   }
 };
 
-// @desc    Delete attendance
-// @route   DELETE /api/attendance/:id
-// @access  Private
+// Delete attendance
 exports.deleteAttendance = async (req, res) => {
   try {
-    const attendance = await Attendance.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    
+    const attendance = await Attendance.findByIdAndDelete(id);
     
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance not found'
+        message: 'Attendance record not found'
       });
     }
+    
+    console.log(`🗑️ Deleted attendance: ${id}`);
     
     res.json({
       success: true,
       message: 'Attendance deleted successfully'
     });
   } catch (error) {
+    console.error('❌ Delete attendance error:', error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
+
+// Get today's attendance count
+exports.getTodayAttendance = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const count = await Attendance.countDocuments({
+      date: {
+        $gte: today,
+        $lt: tomorrow
+      }
+    });
+    
+    console.log(`📊 Today's attendance: ${count}`);
+    
+    res.json({
+      success: true,
+      count,
+      date: today.toISOString().split('T')[0]
+    });
+  } catch (error) {
+    console.error('❌ Today attendance error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+  
