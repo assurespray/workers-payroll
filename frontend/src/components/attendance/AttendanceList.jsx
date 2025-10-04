@@ -56,33 +56,33 @@ const AttendanceList = () => {
   const fetchAttendance = async (start, end) => {
     setLoading(true);
     setError('');
-    
+  
     try {
       console.log('Fetching attendance:', { start, end });
-      
+    
       const result = await attendanceService.getAll({
         startDate: start,
         endDate: end,
         limit: 500,
       });
-      
+    
       console.log('Fetch result:', result);
-      
-      // Handle different response formats
-      if (result && result.data) {
-        const records = Array.isArray(result.data) ? result.data : [];
-        setAttendance(records);
-        console.log(`Loaded ${records.length} records`);
+    
+      // Handle response safely
+      if (result && result.data && Array.isArray(result.data)) {
+        setAttendance(result.data);
+        console.log(`Loaded ${result.data.length} records`);
       } else {
         setAttendance([]);
+        console.log('No data in response');
       }
-      
-      if (result.error) {
-        setError(result.error);
+    
+      if (result.message && !result.success) {
+        setError(result.message);
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError(typeof err === 'string' ? err : 'Failed to load attendance records');
+      setError(typeof err === 'string' ? err : 'Failed to load attendance');
       setAttendance([]);
     } finally {
       setLoading(false);
