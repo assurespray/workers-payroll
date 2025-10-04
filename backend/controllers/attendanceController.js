@@ -1,13 +1,11 @@
 const Attendance = require('../models/Attendance');
 
 // Create attendance (bulk)
-exports.createAttendance = async (req, res) => {
+const createAttendance = async (req, res) => {
   try {
     const { attendanceRecords } = req.body;
     
-    console.log('📥 Create attendance request:', {
-      recordCount: attendanceRecords?.length || 0
-    });
+    console.log('📥 Create attendance:', attendanceRecords?.length || 0);
     
     if (!attendanceRecords || !Array.isArray(attendanceRecords)) {
       return res.status(400).json({
@@ -23,10 +21,9 @@ exports.createAttendance = async (req, res) => {
       });
     }
     
-    // Insert all records
     const createdRecords = await Attendance.insertMany(attendanceRecords);
     
-    console.log(`✅ Created ${createdRecords.length} attendance records`);
+    console.log(`✅ Created ${createdRecords.length} records`);
     
     res.status(201).json({
       success: true,
@@ -35,7 +32,7 @@ exports.createAttendance = async (req, res) => {
       data: createdRecords
     });
   } catch (error) {
-    console.error('❌ Create attendance error:', error);
+    console.error('❌ Create error:', error);
     
     if (error.code === 11000) {
       return res.status(400).json({
@@ -52,7 +49,7 @@ exports.createAttendance = async (req, res) => {
 };
 
 // Get all attendance with filters
-exports.getAllAttendance = async (req, res) => {
+const getAllAttendance = async (req, res) => {
   try {
     const { startDate, endDate, employeeId, contractorId, siteId, limit = 100 } = req.query;
     
@@ -60,7 +57,6 @@ exports.getAllAttendance = async (req, res) => {
     
     const query = {};
     
-    // Date range filter
     if (startDate && endDate) {
       query.date = {
         $gte: new Date(startDate),
@@ -68,12 +64,10 @@ exports.getAllAttendance = async (req, res) => {
       };
     }
     
-    // Other filters
     if (employeeId) query.employeeId = employeeId;
     if (contractorId) query.contractorId = contractorId;
     if (siteId) query.siteId = siteId;
     
-    // Execute query
     const attendance = await Attendance.find(query)
       .populate('employeeId', 'name employeeId')
       .populate('contractorId', 'name contractorId')
@@ -88,7 +82,7 @@ exports.getAllAttendance = async (req, res) => {
       data: attendance
     });
   } catch (error) {
-    console.error('❌ Get attendance error:', error);
+    console.error('❌ Get error:', error);
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch attendance'
@@ -97,7 +91,7 @@ exports.getAllAttendance = async (req, res) => {
 };
 
 // Get attendance by ID
-exports.getAttendanceById = async (req, res) => {
+const getAttendanceById = async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -108,7 +102,7 @@ exports.getAttendanceById = async (req, res) => {
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance record not found'
+        message: 'Attendance not found'
       });
     }
     
@@ -117,7 +111,7 @@ exports.getAttendanceById = async (req, res) => {
       data: attendance
     });
   } catch (error) {
-    console.error('❌ Get attendance by ID error:', error);
+    console.error('❌ Get by ID error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -126,7 +120,7 @@ exports.getAttendanceById = async (req, res) => {
 };
 
 // Update attendance
-exports.updateAttendance = async (req, res) => {
+const updateAttendance = async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -140,19 +134,19 @@ exports.updateAttendance = async (req, res) => {
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance record not found'
+        message: 'Attendance not found'
       });
     }
     
-    console.log(`✅ Updated attendance: ${id}`);
+    console.log(`✅ Updated: ${id}`);
     
     res.json({
       success: true,
-      message: 'Attendance updated successfully',
+      message: 'Attendance updated',
       data: attendance
     });
   } catch (error) {
-    console.error('❌ Update attendance error:', error);
+    console.error('❌ Update error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -161,7 +155,7 @@ exports.updateAttendance = async (req, res) => {
 };
 
 // Delete attendance
-exports.deleteAttendance = async (req, res) => {
+const deleteAttendance = async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -170,18 +164,18 @@ exports.deleteAttendance = async (req, res) => {
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message: 'Attendance record not found'
+        message: 'Attendance not found'
       });
     }
     
-    console.log(`🗑️ Deleted attendance: ${id}`);
+    console.log(`🗑️ Deleted: ${id}`);
     
     res.json({
       success: true,
-      message: 'Attendance deleted successfully'
+      message: 'Attendance deleted'
     });
   } catch (error) {
-    console.error('❌ Delete attendance error:', error);
+    console.error('❌ Delete error:', error);
     res.status(500).json({
       success: false,
       message: error.message
@@ -190,7 +184,7 @@ exports.deleteAttendance = async (req, res) => {
 };
 
 // Get today's attendance count
-exports.getTodayAttendance = async (req, res) => {
+const getTodayAttendance = async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -205,7 +199,7 @@ exports.getTodayAttendance = async (req, res) => {
       }
     });
     
-    console.log(`📊 Today's attendance: ${count}`);
+    console.log(`📊 Today: ${count}`);
     
     res.json({
       success: true,
@@ -213,11 +207,20 @@ exports.getTodayAttendance = async (req, res) => {
       date: today.toISOString().split('T')[0]
     });
   } catch (error) {
-    console.error('❌ Today attendance error:', error);
+    console.error('❌ Today error:', error);
     res.status(500).json({
       success: false,
       message: error.message
     });
   }
 };
-  
+
+// CRITICAL: Correct export format
+module.exports = {
+  createAttendance,
+  getAllAttendance,
+  getAttendanceById,
+  updateAttendance,
+  deleteAttendance,
+  getTodayAttendance
+};
